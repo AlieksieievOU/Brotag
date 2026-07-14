@@ -7,5 +7,5 @@ function escapeHtml(text: string): string {
 export function formatMentions(members: Member[]): string {
   return members
     .map((m) => `<a href="tg://user?id=${m.userId}">${escapeHtml(m.firstName)}</a>`)
-    .join("\n");
+    .join(" ");
 }

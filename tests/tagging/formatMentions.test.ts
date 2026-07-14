@@ -7,12 +7,12 @@ describe("formatMentions", () => {
     expect(text).toBe('<a href="tg://user?id=100">Ada</a>');
   });
 
-  it("formats multiple members, one per line", () => {
+  it("formats multiple members in one row, space-separated", () => {
     const text = formatMentions([
       { chatId: 1, userId: 100, firstName: "Ada" },
       { chatId: 1, userId: 200, firstName: "Grace" },
     ]);
-    expect(text).toBe('<a href="tg://user?id=100">Ada</a>\n<a href="tg://user?id=200">Grace</a>');
+    expect(text).toBe('<a href="tg://user?id=100">Ada</a> <a href="tg://user?id=200">Grace</a>');
   });
 
   it("returns an empty string for no members", () => {

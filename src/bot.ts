@@ -301,7 +301,9 @@ export function createBot(token: string, store: Store): Bot {
     if (parseTags(ctx.message.text).includes("all")) {
       await syncAdminsToStore(ctx.api, store, ctx.chat.id);
     }
-    const members = await resolveTags(ctx.message.text, store, ctx.chat.id);
+    const resolved = await resolveTags(ctx.message.text, store, ctx.chat.id);
+    // Tagging the person who wrote the message is pointless noise.
+    const members = ctx.from ? resolved.filter((m) => m.userId !== ctx.from!.id) : resolved;
     if (members.length === 0) return;
     const mentionText = formatMentions(members);
     await ctx.reply(mentionText, {
