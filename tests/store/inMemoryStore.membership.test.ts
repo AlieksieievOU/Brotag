@@ -37,6 +37,17 @@ describe("InMemoryStore role membership", () => {
     expect(roles.map((r) => r.name).sort()).toEqual(["Designers", "Moderators"]);
   });
 
+  it("deleteMember removes a member so they no longer appear in getMembers", async () => {
+    const store = new InMemoryStore();
+    await store.upsertMember({ chatId: 1, userId: 100, firstName: "Ada" });
+    await store.upsertMember({ chatId: 1, userId: 1087968824, firstName: "Group" });
+
+    await store.deleteMember(1, 1087968824);
+
+    const members = await store.getMembers(1);
+    expect(members).toEqual([{ chatId: 1, userId: 100, firstName: "Ada" }]);
+  });
+
   it("getRoleMembers returns an empty array for an unknown roleId", async () => {
     const store = new InMemoryStore();
     const members = await store.getRoleMembers("does-not-exist");

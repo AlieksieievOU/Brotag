@@ -14,6 +14,10 @@ export class InMemoryStore implements Store {
     this.members.set(memberKey(member.chatId, member.userId), member);
   }
 
+  async deleteMember(chatId: number, userId: number): Promise<void> {
+    this.members.delete(memberKey(chatId, userId));
+  }
+
   async getMembers(chatId: number): Promise<Member[]> {
     return [...this.members.values()].filter((m) => m.chatId === chatId);
   }

@@ -10,8 +10,12 @@ if (!token || !webhookUrl) {
 const bot = new Bot(token);
 
 async function main() {
-  await bot.api.setWebhook(webhookUrl!);
-  console.log(`Webhook set to ${webhookUrl}`);
+  // "chat_member" (join/leave) updates are not delivered by default; listing
+  // allowed_updates overrides the default set, so "message" must stay listed.
+  await bot.api.setWebhook(webhookUrl!, {
+    allowed_updates: ["message", "chat_member"],
+  });
+  console.log(`Webhook set to ${webhookUrl} (updates: message, chat_member)`);
 }
 
 main().catch((err) => {

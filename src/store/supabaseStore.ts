@@ -19,6 +19,15 @@ export class SupabaseStore implements Store {
     if (error) throw error;
   }
 
+  async deleteMember(chatId: number, userId: number): Promise<void> {
+    const { error } = await this.client
+      .from("members")
+      .delete()
+      .eq("chat_id", chatId)
+      .eq("user_id", userId);
+    if (error) throw error;
+  }
+
   async getMembers(chatId: number): Promise<Member[]> {
     const { data, error } = await this.client.from("members").select("*").eq("chat_id", chatId);
     if (error) throw error;

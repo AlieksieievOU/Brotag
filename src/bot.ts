@@ -1,8 +1,10 @@
-import { Bot } from "grammy";
+import { Bot, type Api } from "grammy";
+import type { ChatMember } from "grammy/types";
 import type { Store, Member } from "./store/types.js";
 import { isGroupAdmin } from "./permissions.js";
 import { handleCreateRole, handleDeleteRole, handleListRoles } from "./commands/roleCommands.js";
 import { handleAssign, handleUnassign, handleMyRoles } from "./commands/assignCommands.js";
+import { parseTags } from "./tagging/parseTags.js";
 import { resolveTags } from "./tagging/resolveTags.js";
 import { formatMentions } from "./tagging/formatMentions.js";
 
@@ -11,10 +13,10 @@ function isGroupChat(chatType: string): boolean {
 }
 
 function replyTargetFrom(
-  replyToUser: { id: number; first_name: string; username?: string } | undefined,
+  replyToUser: { id: number; is_bot: boolean; first_name: string; username?: string } | undefined,
   chatId: number,
 ): Member | undefined {
-  if (!replyToUser) return undefined;
+  if (!replyToUser || replyToUser.is_bot) return undefined;
   return {
     chatId,
     userId: replyToUser.id,
@@ -23,20 +25,77 @@ function replyTargetFrom(
   };
 }
 
+function isActiveMember(chatMember: ChatMember): boolean {
+  switch (chatMember.status) {
+    case "creator":
+    case "administrator":
+    case "member":
+      return true;
+    case "restricted":
+      return chatMember.is_member;
+    default:
+      return false;
+  }
+}
+
+// The Bot API has no "list all members" call, so the member store is fed from
+// three sources: message senders, chat_member join/leave updates, and — right
+// before an @all tag — the live admin list fetched here.
+async function syncAdminsToStore(api: Api, store: Store, chatId: number): Promise<void> {
+  try {
+    const admins = await api.getChatAdministrators(chatId);
+    for (const admin of admins) {
+      if (admin.user.is_bot) continue;
+      await store.upsertMember({
+        chatId,
+        userId: admin.user.id,
+        firstName: admin.user.first_name,
+        username: admin.user.username,
+      });
+    }
+  } catch (err) {
+    console.error("Failed to sync chat administrators:", err);
+  }
+}
+
 export function createBot(token: string, store: Store): Bot {
   const bot = new Bot(token);
 
-  // Track every poster as a known member of the chat.
+  // Track every poster as a known member of the chat. Bots are never real
+  // members (anonymous admins post as @GroupAnonymousBot, channels as
+  // @Channel_Bot), so drop any bot row that slipped in before this guard.
   bot.on("message", async (ctx, next) => {
     if (isGroupChat(ctx.chat.type) && ctx.from) {
-      await store.upsertMember({
-        chatId: ctx.chat.id,
-        userId: ctx.from.id,
-        firstName: ctx.from.first_name,
-        username: ctx.from.username,
-      });
+      if (ctx.from.is_bot) {
+        await store.deleteMember(ctx.chat.id, ctx.from.id);
+      } else {
+        await store.upsertMember({
+          chatId: ctx.chat.id,
+          userId: ctx.from.id,
+          firstName: ctx.from.first_name,
+          username: ctx.from.username,
+        });
+      }
     }
     await next();
+  });
+
+  // Track joins/leaves. These updates are only delivered when the bot is an
+  // admin AND the webhook subscribes to "chat_member" (see scripts/set-webhook.ts).
+  bot.on("chat_member", async (ctx) => {
+    if (!isGroupChat(ctx.chat.type)) return;
+    const updated = ctx.chatMember.new_chat_member;
+    if (updated.user.is_bot) return;
+    if (isActiveMember(updated)) {
+      await store.upsertMember({
+        chatId: ctx.chat.id,
+        userId: updated.user.id,
+        firstName: updated.user.first_name,
+        username: updated.user.username,
+      });
+    } else {
+      await store.deleteMember(ctx.chat.id, updated.user.id);
+    }
   });
 
   bot.command("createrole", async (ctx) => {
@@ -100,6 +159,11 @@ export function createBot(token: string, store: Store): Bot {
   bot.on("message:text", async (ctx) => {
     if (!isGroupChat(ctx.chat.type)) return;
     if (ctx.message.text.startsWith("/")) return;
+    // @all should cover admins even if they never posted (e.g. only ever
+    // posted anonymously), so refresh the admin list before resolving.
+    if (parseTags(ctx.message.text).includes("all")) {
+      await syncAdminsToStore(ctx.api, store, ctx.chat.id);
+    }
     const members = await resolveTags(ctx.message.text, store, ctx.chat.id);
     if (members.length === 0) return;
     const mentionText = formatMentions(members);

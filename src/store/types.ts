@@ -13,6 +13,7 @@ export interface Role {
 
 export interface Store {
   upsertMember(member: Member): Promise<void>;
+  deleteMember(chatId: number, userId: number): Promise<void>;
   getMembers(chatId: number): Promise<Member[]>;
   getMember(chatId: number, userId: number): Promise<Member | undefined>;
 
