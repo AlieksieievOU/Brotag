@@ -6,7 +6,7 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "set-webhook": "tsx scripts/set-webhook.ts"
+    "set-webhook": "tsx --env-file=.env scripts/set-webhook.ts"
   },
   "dependencies": {
     "grammy": "^1.21.1",
