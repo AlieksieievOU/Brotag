@@ -3,6 +3,8 @@ export interface Member {
   userId: number;
   username?: string;
   firstName: string;
+  /** Recurring birthday, stored as "MM-DD" (no year). */
+  birthday?: string;
 }
 
 export interface Role {
@@ -17,6 +19,7 @@ export interface Store {
   getMembers(chatId: number): Promise<Member[]>;
   getMember(chatId: number, userId: number): Promise<Member | undefined>;
   findMemberByUsername(chatId: number, username: string): Promise<Member | undefined>;
+  setBirthday(chatId: number, userId: number, birthday: string): Promise<void>;
 
   createRole(chatId: number, name: string): Promise<Role>;
   deleteRole(chatId: number, name: string): Promise<void>;

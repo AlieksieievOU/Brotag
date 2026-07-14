@@ -8,6 +8,8 @@ create table members (
   user_id bigint not null,
   username text,
   first_name text not null,
+  -- Recurring birthday, "MM-DD" (no year), set via /setbirthday.
+  birthday text,
   primary key (chat_id, user_id)
 );
 

@@ -33,6 +33,13 @@ export class InMemoryStore implements Store {
     );
   }
 
+  async setBirthday(chatId: number, userId: number, birthday: string): Promise<void> {
+    const key = memberKey(chatId, userId);
+    const existing = this.members.get(key);
+    if (!existing) return;
+    this.members.set(key, { ...existing, birthday });
+  }
+
   async createRole(chatId: number, name: string): Promise<Role> {
     const role: Role = { id: String(this.nextRoleId++), chatId, name };
     this.roles.set(role.id, role);

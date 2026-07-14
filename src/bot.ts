@@ -4,6 +4,7 @@ import type { Store, Member, Role } from "./store/types.js";
 import { isGroupAdmin } from "./permissions.js";
 import { handleCreateRole, handleDeleteRole, handleListRoles } from "./commands/roleCommands.js";
 import { handleAssign, handleUnassign, handleMyRoles, NO_TARGET_MESSAGE } from "./commands/assignCommands.js";
+import { handleSetBirthday, handleBirthdays } from "./commands/birthdayCommands.js";
 import { parseTags } from "./tagging/parseTags.js";
 import { resolveTags } from "./tagging/resolveTags.js";
 import { formatMentions } from "./tagging/formatMentions.js";
@@ -34,6 +35,8 @@ const HELP_TEXT = `Commands:
 /unassign <role> @username - remove a role (admins only; or reply to the user's message with /unassign <role>)
 /unassign @username - omit the role to pick from the user's current roles instead (same for a reply with no role)
 /myroles - show your own roles
+/setbirthday DD-MM - set your own birthday (e.g. /setbirthday 24-12)
+/birthdays - list members' birthdays, soonest first
 /help - show this message
 
 Tagging:
@@ -245,6 +248,25 @@ export function createBot(token: string, store: Store): Bot {
     if (!isGroupChat(ctx.chat.type)) return ctx.reply("This command only works in a group.");
     if (!ctx.from) return;
     return ctx.reply(await handleMyRoles(store, ctx.chat.id, ctx.from.id));
+  });
+
+  bot.command("setbirthday", async (ctx) => {
+    if (!isGroupChat(ctx.chat.type)) return ctx.reply("This command only works in a group.");
+    if (!ctx.from) return;
+    const raw = ctx.match.trim();
+    if (!raw) return ctx.reply("Usage: /setbirthday DD-MM (e.g. /setbirthday 24-12)");
+    const target: Member = {
+      chatId: ctx.chat.id,
+      userId: ctx.from.id,
+      firstName: ctx.from.first_name,
+      username: ctx.from.username,
+    };
+    return ctx.reply(await handleSetBirthday(store, target, raw));
+  });
+
+  bot.command("birthdays", async (ctx) => {
+    if (!isGroupChat(ctx.chat.type)) return ctx.reply("This command only works in a group.");
+    return ctx.reply(await handleBirthdays(store, ctx.chat.id));
   });
 
   bot.command(["help", "commands"], async (ctx) => {

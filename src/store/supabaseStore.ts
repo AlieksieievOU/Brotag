@@ -56,6 +56,15 @@ export class SupabaseStore implements Store {
     return data ? rowToMember(data) : undefined;
   }
 
+  async setBirthday(chatId: number, userId: number, birthday: string): Promise<void> {
+    const { error } = await this.client
+      .from("members")
+      .update({ birthday })
+      .eq("chat_id", chatId)
+      .eq("user_id", userId);
+    if (error) throw error;
+  }
+
   async createRole(chatId: number, name: string): Promise<Role> {
     const { data, error } = await this.client
       .from("roles")
@@ -147,6 +156,7 @@ function rowToMember(row: any): Member {
     userId: row.user_id,
     firstName: row.first_name,
     username: row.username ?? undefined,
+    birthday: row.birthday ?? undefined,
   };
 }
 

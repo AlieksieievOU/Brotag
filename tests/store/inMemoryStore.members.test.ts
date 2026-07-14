@@ -47,4 +47,20 @@ describe("InMemoryStore member tracking", () => {
     const member = await store.findMemberByUsername(1, "nobody");
     expect(member).toBeUndefined();
   });
+
+  it("sets a birthday on an existing member", async () => {
+    const store = new InMemoryStore();
+    await store.upsertMember({ chatId: 1, userId: 100, firstName: "Ada" });
+
+    await store.setBirthday(1, 100, "12-24");
+
+    const member = await store.getMember(1, 100);
+    expect(member).toEqual({ chatId: 1, userId: 100, firstName: "Ada", birthday: "12-24" });
+  });
+
+  it("is a no-op setting a birthday for an unknown member", async () => {
+    const store = new InMemoryStore();
+    await store.setBirthday(1, 999, "12-24");
+    expect(await store.getMember(1, 999)).toBeUndefined();
+  });
 });
