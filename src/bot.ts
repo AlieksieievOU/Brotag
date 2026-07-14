@@ -97,10 +97,23 @@ function isActiveMember(chatMember: ChatMember): boolean {
   }
 }
 
+// Telegram's own pseudo-accounts (not real users) that can end up stored as a
+// "member" if they were ever the sender of a message: the anonymous-admin
+// identity, a linked channel's posting identity, and the Telegram service
+// account. Their ids are fixed platform-wide, not per-chat.
+const PSEUDO_USER_IDS = new Set([1087968824, 136817688, 777000]);
+
 // The Bot API has no "list all members" call, so the member store is fed from
 // three sources: message senders, chat_member join/leave updates, and — right
-// before an @all tag — the live admin list fetched here.
+// before an @all tag — the live admin list fetched here. This is also the
+// only point where every chat is guaranteed to be touched regularly, so it
+// doubles as a sweep to purge any pseudo-account row left over from before
+// the is_bot guards existed (those only clean up reactively, on that
+// specific pseudo-account's next message).
 async function syncAdminsToStore(api: Api, store: Store, chatId: number): Promise<void> {
+  for (const pseudoUserId of PSEUDO_USER_IDS) {
+    await store.deleteMember(chatId, pseudoUserId);
+  }
   try {
     const admins = await api.getChatAdministrators(chatId);
     for (const admin of admins) {
@@ -302,8 +315,11 @@ export function createBot(token: string, store: Store): Bot {
       await syncAdminsToStore(ctx.api, store, ctx.chat.id);
     }
     const resolved = await resolveTags(ctx.message.text, store, ctx.chat.id);
-    // Tagging the person who wrote the message is pointless noise.
-    const members = ctx.from ? resolved.filter((m) => m.userId !== ctx.from!.id) : resolved;
+    // Tagging the person who wrote the message is pointless noise; pseudo
+    // accounts (e.g. @GroupAnonymousBot) are never real members to tag.
+    const members = resolved.filter(
+      (m) => m.userId !== ctx.from?.id && !PSEUDO_USER_IDS.has(m.userId),
+    );
     if (members.length === 0) return;
     const mentionText = formatMentions(members);
     await ctx.reply(mentionText, {
