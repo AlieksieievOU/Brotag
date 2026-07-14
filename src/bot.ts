@@ -5,6 +5,7 @@ import { isGroupAdmin } from "./permissions.js";
 import { handleCreateRole, handleDeleteRole, handleListRoles } from "./commands/roleCommands.js";
 import { handleAssign, handleUnassign, handleMyRoles, NO_TARGET_MESSAGE } from "./commands/assignCommands.js";
 import { handleSetBirthday, handleBirthdays } from "./commands/birthdayCommands.js";
+import { handleHoroscope } from "./commands/horoscopeCommands.js";
 import { parseTags } from "./tagging/parseTags.js";
 import { resolveTags } from "./tagging/resolveTags.js";
 import { formatMentions } from "./tagging/formatMentions.js";
@@ -37,6 +38,7 @@ const HELP_TEXT = `Commands:
 /myroles - show your own roles
 /setbirthday DD-MM - set your own birthday (e.g. /setbirthday 24-12)
 /birthdays - list members' birthdays, soonest first
+/horoscope @username - a joke daily horoscope based on their zodiac sign (or reply to their message; omit target for your own)
 /help - show this message
 
 Tagging:
@@ -267,6 +269,19 @@ export function createBot(token: string, store: Store): Bot {
   bot.command("birthdays", async (ctx) => {
     if (!isGroupChat(ctx.chat.type)) return ctx.reply("This command only works in a group.");
     return ctx.reply(await handleBirthdays(store, ctx.chat.id));
+  });
+
+  bot.command(["horoscope", "goroscope"], async (ctx) => {
+    if (!isGroupChat(ctx.chat.type)) return ctx.reply("This command only works in a group.");
+    if (!ctx.from) return;
+    const raw = ctx.match.trim();
+    const replyToUser = ctx.message?.reply_to_message?.from;
+    const { username } = parseAssignArgs(raw);
+    let target = await resolveAssignTarget(store, ctx.chat.id, replyToUser, username);
+    if (!target && !username && !replyToUser) {
+      target = await store.getMember(ctx.chat.id, ctx.from.id);
+    }
+    return ctx.reply(await handleHoroscope(target));
   });
 
   bot.command(["help", "commands"], async (ctx) => {
