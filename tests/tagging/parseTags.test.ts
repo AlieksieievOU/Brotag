@@ -29,4 +29,12 @@ describe("parseTags", () => {
   it("is case-sensitive for role names but not for the all keyword casing itself", () => {
     expect(parseTags("@ALL")).toEqual([]);
   });
+
+  it("extracts a lowercase-initial role tag", () => {
+    expect(parseTags("@devs ping")).toEqual(["devs"]);
+  });
+
+  it("extracts an all-caps role tag", () => {
+    expect(parseTags("@QA ping")).toEqual(["QA"]);
+  });
 });
