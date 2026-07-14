@@ -1,9 +1,9 @@
-import { Bot, type Api } from "grammy";
+import { Bot, InlineKeyboard, type Api } from "grammy";
 import type { ChatMember } from "grammy/types";
-import type { Store, Member } from "./store/types.js";
+import type { Store, Member, Role } from "./store/types.js";
 import { isGroupAdmin } from "./permissions.js";
 import { handleCreateRole, handleDeleteRole, handleListRoles } from "./commands/roleCommands.js";
-import { handleAssign, handleUnassign, handleMyRoles } from "./commands/assignCommands.js";
+import { handleAssign, handleUnassign, handleMyRoles, NO_TARGET_MESSAGE } from "./commands/assignCommands.js";
 import { parseTags } from "./tagging/parseTags.js";
 import { resolveTags } from "./tagging/resolveTags.js";
 import { formatMentions } from "./tagging/formatMentions.js";
@@ -30,7 +30,9 @@ const HELP_TEXT = `Commands:
 /deleterole <name> - delete a role (admins only)
 /roles - list roles and member counts
 /assign <role> @username - assign a role (admins only; or reply to the user's message with /assign <role>)
+/assign @username - omit the role to pick one from a button list instead (same for a reply with no role)
 /unassign <role> @username - remove a role (admins only; or reply to the user's message with /unassign <role>)
+/unassign @username - omit the role to pick from the user's current roles instead (same for a reply with no role)
 /myroles - show your own roles
 /help - show this message
 
@@ -62,6 +64,19 @@ async function resolveAssignTarget(
   if (replyTarget) return replyTarget;
   if (!username) return undefined;
   return store.findMemberByUsername(chatId, username);
+}
+
+// callback_data encodes as "<action>|<roleName>|<userId>". Role names can't
+// contain "|" (see VALID_ROLE_NAME in roleCommands.ts), so the delimiter is safe.
+const CALLBACK_DATA_PATTERN = /^(assign|unassign)\|(.+)\|(\d+)$/;
+
+function buildRoleKeyboard(action: "assign" | "unassign", userId: number, roles: Role[]): InlineKeyboard {
+  const keyboard = new InlineKeyboard();
+  roles.forEach((role, i) => {
+    keyboard.text(role.name, `${action}|${role.name}|${userId}`);
+    if (i % 2 === 1) keyboard.row();
+  });
+  return keyboard;
 }
 
 function isActiveMember(chatMember: ChatMember): boolean {
@@ -168,16 +183,20 @@ export function createBot(token: string, store: Store): Bot {
       return ctx.reply("Only group admins can assign roles.");
     }
     const raw = ctx.match.trim();
-    if (!raw) return ctx.reply("Usage: /assign <role> @username, or reply to a user's message with /assign <role>");
+    const replyToUser = ctx.message?.reply_to_message?.from;
+    if (!raw && !replyToUser) {
+      return ctx.reply("Usage: /assign <role> @username, or reply to a user's message with /assign <role>");
+    }
     const { roleName, username } = parseAssignArgs(raw);
-    if (!roleName) return ctx.reply("Usage: /assign <role> @username, or reply to a user's message with /assign <role>");
-    const target = await resolveAssignTarget(
-      store,
-      ctx.chat.id,
-      ctx.message?.reply_to_message?.from,
-      username,
-    );
-    return ctx.reply(await handleAssign(store, ctx.chat.id, roleName, target));
+    const target = await resolveAssignTarget(store, ctx.chat.id, replyToUser, username);
+    if (!target) return ctx.reply(NO_TARGET_MESSAGE);
+    if (roleName) return ctx.reply(await handleAssign(store, ctx.chat.id, roleName, target));
+
+    const roles = await store.listRoles(ctx.chat.id);
+    if (roles.length === 0) return ctx.reply("No roles have been created yet. Use /createrole <name> first.");
+    return ctx.reply(`Choose a role to assign to ${target.firstName}:`, {
+      reply_markup: buildRoleKeyboard("assign", target.userId, roles),
+    });
   });
 
   bot.command("unassign", async (ctx) => {
@@ -186,16 +205,40 @@ export function createBot(token: string, store: Store): Bot {
       return ctx.reply("Only group admins can unassign roles.");
     }
     const raw = ctx.match.trim();
-    if (!raw) return ctx.reply("Usage: /unassign <role> @username, or reply to a user's message with /unassign <role>");
+    const replyToUser = ctx.message?.reply_to_message?.from;
+    if (!raw && !replyToUser) {
+      return ctx.reply("Usage: /unassign <role> @username, or reply to a user's message with /unassign <role>");
+    }
     const { roleName, username } = parseAssignArgs(raw);
-    if (!roleName) return ctx.reply("Usage: /unassign <role> @username, or reply to a user's message with /unassign <role>");
-    const target = await resolveAssignTarget(
-      store,
-      ctx.chat.id,
-      ctx.message?.reply_to_message?.from,
-      username,
-    );
-    return ctx.reply(await handleUnassign(store, ctx.chat.id, roleName, target));
+    const target = await resolveAssignTarget(store, ctx.chat.id, replyToUser, username);
+    if (!target) return ctx.reply(NO_TARGET_MESSAGE);
+    if (roleName) return ctx.reply(await handleUnassign(store, ctx.chat.id, roleName, target));
+
+    const roles = await store.getUserRoles(ctx.chat.id, target.userId);
+    if (roles.length === 0) return ctx.reply(`${target.firstName} has no roles to remove.`);
+    return ctx.reply(`Choose a role to remove from ${target.firstName}:`, {
+      reply_markup: buildRoleKeyboard("unassign", target.userId, roles),
+    });
+  });
+
+  bot.on("callback_query:data", async (ctx) => {
+    const match = CALLBACK_DATA_PATTERN.exec(ctx.callbackQuery.data);
+    if (!match || !ctx.chat) return ctx.answerCallbackQuery();
+    const [, action, roleName, userIdStr] = match;
+    if (!(await isGroupAdmin(ctx.api, ctx.chat.id, ctx.from.id))) {
+      return ctx.answerCallbackQuery({ text: "Only group admins can do this.", show_alert: true });
+    }
+    const target = await store.getMember(ctx.chat.id, Number(userIdStr));
+    if (!target) {
+      await ctx.answerCallbackQuery();
+      return ctx.editMessageText("That user is no longer tracked.");
+    }
+    const resultText =
+      action === "assign"
+        ? await handleAssign(store, ctx.chat.id, roleName, target)
+        : await handleUnassign(store, ctx.chat.id, roleName, target);
+    await ctx.answerCallbackQuery();
+    return ctx.editMessageText(resultText);
   });
 
   bot.command("myroles", async (ctx) => {
