@@ -16,6 +16,7 @@ export async function handleAssign(
   if (!target) {
     return NO_TARGET_MESSAGE;
   }
+  await store.upsertMember(target);
   await store.assignUserToRole(role.id, target.userId);
   return `${target.firstName} added to ${roleName}.`;
 }

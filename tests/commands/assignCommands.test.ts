@@ -66,4 +66,17 @@ describe("assignment commands", () => {
     const reply = await handleMyRoles(store, 1, 100);
     expect(reply).toBe("You have no roles in this group.");
   });
+
+  it("upserts a target that never posted before, so they can be tagged afterward", async () => {
+    const store = new InMemoryStore();
+    const role = await store.createRole(1, "Designers");
+    const target = { chatId: 1, userId: 100, firstName: "Ada" };
+    // Note: target is never upserted into the store before assignment.
+
+    const reply = await handleAssign(store, 1, "Designers", target);
+    expect(reply).toBe("Ada added to Designers.");
+
+    const members = await store.getRoleMembers(role.id);
+    expect(members.map((m) => m.userId)).toEqual([100]);
+  });
 });

@@ -47,6 +47,26 @@ describe("role management commands", () => {
     const reply = await handleListRoles(store, 1);
     expect(reply).toBe("No roles have been created yet.");
   });
+
+  const INVALID_NAME_MESSAGE =
+    "Role names must start with a letter and contain only letters, digits, or underscores (and can't be \"all\").";
+
+  it.each(["My Team", "2fa", "front-end", "all", "ALL"])(
+    "rejects an untaggable role name: %s",
+    async (name) => {
+      const store = new InMemoryStore();
+      const reply = await handleCreateRole(store, 1, name);
+      expect(reply).toBe(INVALID_NAME_MESSAGE);
+      expect(await store.findRole(1, name)).toBeUndefined();
+    },
+  );
+
+  it("still creates valid role names", async () => {
+    const store = new InMemoryStore();
+    const reply = await handleCreateRole(store, 1, "front_end2");
+    expect(reply).toBe('Role "front_end2" created.');
+    expect(await store.findRole(1, "front_end2")).toBeDefined();
+  });
 });
 
 async function handleCreateRoleAndReturn(store: InMemoryStore, chatId: number, name: string) {

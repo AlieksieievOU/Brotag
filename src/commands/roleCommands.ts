@@ -1,6 +1,13 @@
 import type { Store } from "../store/types";
 
+const VALID_ROLE_NAME = /^[A-Za-z][A-Za-z0-9_]*$/;
+const INVALID_NAME_MESSAGE =
+  'Role names must start with a letter and contain only letters, digits, or underscores (and can\'t be "all").';
+
 export async function handleCreateRole(store: Store, chatId: number, name: string): Promise<string> {
+  if (!VALID_ROLE_NAME.test(name) || name.toLowerCase() === "all") {
+    return INVALID_NAME_MESSAGE;
+  }
   const existing = await store.findRole(chatId, name);
   if (existing) {
     return `Role "${name}" already exists.`;

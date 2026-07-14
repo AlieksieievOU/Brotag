@@ -104,7 +104,7 @@ export function createBot(token: string, store: Store): Bot {
     if (members.length === 0) return;
     const mentionText = formatMentions(members);
     await ctx.reply(mentionText, {
-      parse_mode: "Markdown",
+      parse_mode: "HTML",
       reply_parameters: { message_id: ctx.message.message_id },
     });
   });
