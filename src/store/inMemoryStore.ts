@@ -26,6 +26,13 @@ export class InMemoryStore implements Store {
     return this.members.get(memberKey(chatId, userId));
   }
 
+  async findMemberByUsername(chatId: number, username: string): Promise<Member | undefined> {
+    const target = username.toLowerCase();
+    return [...this.members.values()].find(
+      (m) => m.chatId === chatId && m.username?.toLowerCase() === target,
+    );
+  }
+
   async createRole(chatId: number, name: string): Promise<Role> {
     const role: Role = { id: String(this.nextRoleId++), chatId, name };
     this.roles.set(role.id, role);

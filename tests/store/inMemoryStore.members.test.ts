@@ -33,4 +33,18 @@ describe("InMemoryStore member tracking", () => {
     const member = await store.getMember(1, 999);
     expect(member).toBeUndefined();
   });
+
+  it("finds a member by username case-insensitively", async () => {
+    const store = new InMemoryStore();
+    await store.upsertMember({ chatId: 1, userId: 100, firstName: "Ada", username: "AdaLovelace" });
+
+    const member = await store.findMemberByUsername(1, "adalovelace");
+    expect(member).toEqual({ chatId: 1, userId: 100, firstName: "Ada", username: "AdaLovelace" });
+  });
+
+  it("returns undefined from findMemberByUsername for an unknown username", async () => {
+    const store = new InMemoryStore();
+    const member = await store.findMemberByUsername(1, "nobody");
+    expect(member).toBeUndefined();
+  });
 });

@@ -25,6 +25,45 @@ function replyTargetFrom(
   };
 }
 
+const HELP_TEXT = `Commands:
+/createrole <name> - create a role (admins only)
+/deleterole <name> - delete a role (admins only)
+/roles - list roles and member counts
+/assign <role> @username - assign a role (admins only; or reply to the user's message with /assign <role>)
+/unassign <role> @username - remove a role (admins only; or reply to the user's message with /unassign <role>)
+/myroles - show your own roles
+/help - show this message
+
+Tagging:
+@all - mention everyone the bot knows about
+@rolename - mention everyone assigned to that role
+
+Note: assigning by @username only works once that user has posted in this group at least once.`;
+
+// Splits "<role> @username" (in either order) into a role name and an
+// optional target username. Reply-based targeting is handled separately in
+// the command handlers; this only covers the inline @mention form.
+function parseAssignArgs(text: string): { roleName: string; username?: string } {
+  const tokens = text.split(/\s+/).filter(Boolean);
+  const mentionIndex = tokens.findIndex((t) => t.startsWith("@") && t.length > 1);
+  if (mentionIndex === -1) return { roleName: tokens.join(" ") };
+  const username = tokens[mentionIndex].slice(1);
+  const roleName = [...tokens.slice(0, mentionIndex), ...tokens.slice(mentionIndex + 1)].join(" ");
+  return { roleName, username };
+}
+
+async function resolveAssignTarget(
+  store: Store,
+  chatId: number,
+  replyToUser: { id: number; is_bot: boolean; first_name: string; username?: string } | undefined,
+  username: string | undefined,
+): Promise<Member | undefined> {
+  const replyTarget = replyTargetFrom(replyToUser, chatId);
+  if (replyTarget) return replyTarget;
+  if (!username) return undefined;
+  return store.findMemberByUsername(chatId, username);
+}
+
 function isActiveMember(chatMember: ChatMember): boolean {
   switch (chatMember.status) {
     case "creator":
@@ -128,10 +167,17 @@ export function createBot(token: string, store: Store): Bot {
     if (!ctx.from || !(await isGroupAdmin(ctx.api, ctx.chat.id, ctx.from.id))) {
       return ctx.reply("Only group admins can assign roles.");
     }
-    const name = ctx.match.trim();
-    if (!name) return ctx.reply("Usage: reply to a user's message with /assign <role>");
-    const target = replyTargetFrom(ctx.message?.reply_to_message?.from, ctx.chat.id);
-    return ctx.reply(await handleAssign(store, ctx.chat.id, name, target));
+    const raw = ctx.match.trim();
+    if (!raw) return ctx.reply("Usage: /assign <role> @username, or reply to a user's message with /assign <role>");
+    const { roleName, username } = parseAssignArgs(raw);
+    if (!roleName) return ctx.reply("Usage: /assign <role> @username, or reply to a user's message with /assign <role>");
+    const target = await resolveAssignTarget(
+      store,
+      ctx.chat.id,
+      ctx.message?.reply_to_message?.from,
+      username,
+    );
+    return ctx.reply(await handleAssign(store, ctx.chat.id, roleName, target));
   });
 
   bot.command("unassign", async (ctx) => {
@@ -139,16 +185,27 @@ export function createBot(token: string, store: Store): Bot {
     if (!ctx.from || !(await isGroupAdmin(ctx.api, ctx.chat.id, ctx.from.id))) {
       return ctx.reply("Only group admins can unassign roles.");
     }
-    const name = ctx.match.trim();
-    if (!name) return ctx.reply("Usage: reply to a user's message with /unassign <role>");
-    const target = replyTargetFrom(ctx.message?.reply_to_message?.from, ctx.chat.id);
-    return ctx.reply(await handleUnassign(store, ctx.chat.id, name, target));
+    const raw = ctx.match.trim();
+    if (!raw) return ctx.reply("Usage: /unassign <role> @username, or reply to a user's message with /unassign <role>");
+    const { roleName, username } = parseAssignArgs(raw);
+    if (!roleName) return ctx.reply("Usage: /unassign <role> @username, or reply to a user's message with /unassign <role>");
+    const target = await resolveAssignTarget(
+      store,
+      ctx.chat.id,
+      ctx.message?.reply_to_message?.from,
+      username,
+    );
+    return ctx.reply(await handleUnassign(store, ctx.chat.id, roleName, target));
   });
 
   bot.command("myroles", async (ctx) => {
     if (!isGroupChat(ctx.chat.type)) return ctx.reply("This command only works in a group.");
     if (!ctx.from) return;
     return ctx.reply(await handleMyRoles(store, ctx.chat.id, ctx.from.id));
+  });
+
+  bot.command(["help", "commands"], async (ctx) => {
+    return ctx.reply(HELP_TEXT);
   });
 
   // Handles free-text tag mentions (e.g. "@all", "@rolename"). Registered

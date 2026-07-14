@@ -45,6 +45,17 @@ export class SupabaseStore implements Store {
     return data ? rowToMember(data) : undefined;
   }
 
+  async findMemberByUsername(chatId: number, username: string): Promise<Member | undefined> {
+    const { data, error } = await this.client
+      .from("members")
+      .select("*")
+      .eq("chat_id", chatId)
+      .ilike("username", username)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? rowToMember(data) : undefined;
+  }
+
   async createRole(chatId: number, name: string): Promise<Role> {
     const { data, error } = await this.client
       .from("roles")

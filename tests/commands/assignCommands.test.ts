@@ -32,7 +32,7 @@ describe("assignment commands", () => {
 
     const reply = await handleAssign(store, 1, "Designers", undefined);
     expect(reply).toBe(
-      "Couldn't identify that user. Reply to one of their messages with this command, and make sure they've posted in this group before.",
+      "Couldn't identify that user. Reply to one of their messages, or use @username, and make sure they've posted in this group before.",
     );
   });
 
