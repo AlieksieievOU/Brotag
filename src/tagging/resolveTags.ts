@@ -1,5 +1,5 @@
-import type { Member, Store } from "../store/types";
-import { parseTags } from "./parseTags";
+import type { Member, Store } from "../store/types.js";
+import { parseTags } from "./parseTags.js";
 
 export async function resolveTags(text: string, store: Store, chatId: number): Promise<Member[]> {
   const tags = parseTags(text);

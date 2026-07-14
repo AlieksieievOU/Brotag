@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { Member, Role, Store } from "./types";
+import type { Member, Role, Store } from "./types.js";
 
 export class SupabaseStore implements Store {
   private client: SupabaseClient;

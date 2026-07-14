@@ -1,4 +1,4 @@
-import type { Member, Store } from "../store/types";
+import type { Member, Store } from "../store/types.js";
 
 const NO_TARGET_MESSAGE =
   "Couldn't identify that user. Reply to one of their messages with this command, and make sure they've posted in this group before.";

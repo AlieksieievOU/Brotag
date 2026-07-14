@@ -1,7 +1,7 @@
 import { webhookCallback } from "grammy";
 import type { IncomingMessage, ServerResponse } from "http";
-import { createBot } from "../src/bot";
-import { SupabaseStore } from "../src/store/supabaseStore";
+import { createBot } from "../src/bot.js";
+import { SupabaseStore } from "../src/store/supabaseStore.js";
 
 const token = process.env.BOT_TOKEN;
 const supabaseUrl = process.env.SUPABASE_URL;

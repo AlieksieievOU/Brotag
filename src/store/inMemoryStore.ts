@@ -1,4 +1,4 @@
-import type { Member, Role, Store } from "./types";
+import type { Member, Role, Store } from "./types.js";
 
 function memberKey(chatId: number, userId: number): string {
   return `${chatId}:${userId}`;

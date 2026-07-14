@@ -1,4 +1,4 @@
-import type { Member } from "../store/types";
+import type { Member } from "../store/types.js";
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");

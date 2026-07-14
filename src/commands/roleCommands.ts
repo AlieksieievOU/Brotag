@@ -1,4 +1,4 @@
-import type { Store } from "../store/types";
+import type { Store } from "../store/types.js";
 
 const VALID_ROLE_NAME = /^[A-Za-z][A-Za-z0-9_]*$/;
 const INVALID_NAME_MESSAGE =

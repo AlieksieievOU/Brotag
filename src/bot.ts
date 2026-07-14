@@ -1,10 +1,10 @@
 import { Bot } from "grammy";
-import type { Store, Member } from "./store/types";
-import { isGroupAdmin } from "./permissions";
-import { handleCreateRole, handleDeleteRole, handleListRoles } from "./commands/roleCommands";
-import { handleAssign, handleUnassign, handleMyRoles } from "./commands/assignCommands";
-import { resolveTags } from "./tagging/resolveTags";
-import { formatMentions } from "./tagging/formatMentions";
+import type { Store, Member } from "./store/types.js";
+import { isGroupAdmin } from "./permissions.js";
+import { handleCreateRole, handleDeleteRole, handleListRoles } from "./commands/roleCommands.js";
+import { handleAssign, handleUnassign, handleMyRoles } from "./commands/assignCommands.js";
+import { resolveTags } from "./tagging/resolveTags.js";
+import { formatMentions } from "./tagging/formatMentions.js";
 
 function isGroupChat(chatType: string): boolean {
   return chatType === "group" || chatType === "supergroup";
