@@ -6,6 +6,7 @@ import { handleCreateRole, handleDeleteRole, handleListRoles } from "./commands/
 import { handleAssign, handleUnassign, handleMyRoles, NO_TARGET_MESSAGE } from "./commands/assignCommands.js";
 import { handleSetBirthday, handleBirthdays } from "./commands/birthdayCommands.js";
 import { handleHoroscope } from "./commands/horoscopeCommands.js";
+import { handleNaviSchedule } from "./commands/naviCommands.js";
 import { parseTags } from "./tagging/parseTags.js";
 import { resolveTags } from "./tagging/resolveTags.js";
 import { formatMentions } from "./tagging/formatMentions.js";
@@ -39,6 +40,7 @@ const HELP_TEXT = `Commands:
 /setbirthday DD-MM - set your own birthday (e.g. /setbirthday 24-12)
 /birthdays - list members' birthdays, soonest first
 /horoscope @username - a joke daily horoscope based on their zodiac sign (or reply to their message; omit target for your own)
+/navi - upcoming NAVI matches with stream links
 /help - show this message
 
 Tagging:
@@ -295,6 +297,11 @@ export function createBot(token: string, store: Store): Bot {
       target = await store.getMember(ctx.chat.id, ctx.from.id);
     }
     return ctx.reply(await handleHoroscope(target));
+  });
+
+  bot.command("navi", async (ctx) => {
+    if (!isGroupChat(ctx.chat.type)) return ctx.reply("This command only works in a group.");
+    return ctx.reply(await handleNaviSchedule());
   });
 
   bot.command(["help", "commands"], async (ctx) => {
