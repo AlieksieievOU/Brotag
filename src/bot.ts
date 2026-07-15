@@ -7,6 +7,7 @@ import { handleAssign, handleUnassign, handleMyRoles, NO_TARGET_MESSAGE } from "
 import { handleSetBirthday, handleBirthdays } from "./commands/birthdayCommands.js";
 import { handleHoroscope } from "./commands/horoscopeCommands.js";
 import { handleNaviSchedule } from "./commands/naviCommands.js";
+import { handleRoast } from "./commands/roastCommands.js";
 import { parseTags } from "./tagging/parseTags.js";
 import { resolveTags } from "./tagging/resolveTags.js";
 import { formatMentions } from "./tagging/formatMentions.js";
@@ -41,6 +42,7 @@ const HELP_TEXT = `Commands:
 /birthdays - list members' birthdays, soonest first
 /horoscope @username - a joke daily horoscope based on their zodiac sign (or reply to their message; omit target for your own)
 /navi - upcoming NAVI matches with stream links
+/roast @username - a light, good-natured roast (or reply to their message; omit target to roast a random member)
 /help - show this message
 
 Tagging:
@@ -297,6 +299,16 @@ export function createBot(token: string, store: Store): Bot {
       target = await store.getMember(ctx.chat.id, ctx.from.id);
     }
     return ctx.reply(await handleHoroscope(target));
+  });
+
+  bot.command("roast", async (ctx) => {
+    if (!isGroupChat(ctx.chat.type)) return ctx.reply("This command only works in a group.");
+    const raw = ctx.match.trim();
+    const replyToUser = ctx.message?.reply_to_message?.from;
+    const { username } = parseAssignArgs(raw);
+    const target = await resolveAssignTarget(store, ctx.chat.id, replyToUser, username);
+    const members = await store.getMembers(ctx.chat.id);
+    return ctx.reply(handleRoast(members, target));
   });
 
   bot.command("navi", async (ctx) => {
