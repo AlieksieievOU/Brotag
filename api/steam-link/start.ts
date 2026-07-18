@@ -2,8 +2,8 @@ import type { IncomingMessage, ServerResponse } from "http";
 import { SupabaseStore } from "../../src/store/supabaseStore.js";
 import { handleStartRequest } from "../../src/steamLink.js";
 
-const supabaseUrl = process.env.SUPABASE_URL as string;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY as string;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const publicUrl = process.env.PUBLIC_URL as string;
 
 if (!supabaseUrl || !supabaseKey || !publicUrl) {
