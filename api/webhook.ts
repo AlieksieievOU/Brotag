@@ -6,13 +6,14 @@ import { SupabaseStore } from "../src/store/supabaseStore.js";
 const token = process.env.BOT_TOKEN;
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const publicUrl = process.env.PUBLIC_URL;
 
-if (!token || !supabaseUrl || !supabaseKey) {
-  throw new Error("Missing BOT_TOKEN, SUPABASE_URL, or SUPABASE_SERVICE_ROLE_KEY environment variable");
+if (!token || !supabaseUrl || !supabaseKey || !publicUrl) {
+  throw new Error("Missing BOT_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, or PUBLIC_URL environment variable");
 }
 
 const store = new SupabaseStore(supabaseUrl, supabaseKey);
-const bot = createBot(token, store);
+const bot = createBot(token, store, publicUrl);
 const handleUpdate = webhookCallback(bot, "http");
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {

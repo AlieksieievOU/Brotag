@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { Member, Role, Store } from "./types.js";
+import type { Member, Role, SteamLinkToken, Store } from "./types.js";
 
 export class SupabaseStore implements Store {
   private client: SupabaseClient;
@@ -148,6 +148,61 @@ export class SupabaseStore implements Store {
     if (error) throw error;
     return (data ?? []).map((row: any) => rowToRole(row.roles));
   }
+
+  async createSteamLinkToken(record: SteamLinkToken): Promise<void> {
+    const { error } = await this.client.from("steam_link_tokens").insert({
+      token: record.token,
+      chat_id: record.chatId,
+      user_id: record.userId,
+      expires_at: new Date(record.expiresAt).toISOString(),
+    });
+    if (error) throw error;
+  }
+
+  async getSteamLinkToken(token: string): Promise<SteamLinkToken | undefined> {
+    const { data, error } = await this.client
+      .from("steam_link_tokens")
+      .select("*")
+      .eq("token", token)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? rowToSteamLinkToken(data) : undefined;
+  }
+
+  async deleteSteamLinkToken(token: string): Promise<void> {
+    const { error } = await this.client.from("steam_link_tokens").delete().eq("token", token);
+    if (error) throw error;
+  }
+
+  async setSteamLink(chatId: number, userId: number, steamId64: string): Promise<void> {
+    await this.client.from("groups").upsert({ chat_id: chatId });
+    const { error } = await this.client.from("steam_links").upsert({
+      chat_id: chatId,
+      user_id: userId,
+      steam_id64: steamId64,
+    });
+    if (error) throw error;
+  }
+
+  async getSteamLink(chatId: number, userId: number): Promise<string | undefined> {
+    const { data, error } = await this.client
+      .from("steam_links")
+      .select("*")
+      .eq("chat_id", chatId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? (data.steam_id64 as string) : undefined;
+  }
+
+  async deleteSteamLink(chatId: number, userId: number): Promise<void> {
+    const { error } = await this.client
+      .from("steam_links")
+      .delete()
+      .eq("chat_id", chatId)
+      .eq("user_id", userId);
+    if (error) throw error;
+  }
 }
 
 function rowToMember(row: any): Member {
@@ -162,4 +217,13 @@ function rowToMember(row: any): Member {
 
 function rowToRole(row: any): Role {
   return { id: String(row.id), chatId: row.chat_id, name: row.name };
+}
+
+function rowToSteamLinkToken(row: any): SteamLinkToken {
+  return {
+    token: row.token,
+    chatId: row.chat_id,
+    userId: row.user_id,
+    expiresAt: new Date(row.expires_at).getTime(),
+  };
 }
