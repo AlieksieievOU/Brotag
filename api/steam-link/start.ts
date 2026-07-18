@@ -13,14 +13,23 @@ if (!supabaseUrl || !supabaseKey || !publicUrl) {
 const store = new SupabaseStore(supabaseUrl, supabaseKey);
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
-  const url = new URL(req.url ?? "", "http://localhost");
-  const token = url.searchParams.get("token") ?? undefined;
-  const result = await handleStartRequest(store, token, publicUrl);
+  try {
+    const url = new URL(req.url ?? "", "http://localhost");
+    const token = url.searchParams.get("token") ?? undefined;
+    const result = await handleStartRequest(store, token, publicUrl);
 
-  res.statusCode = result.status;
-  for (const [key, value] of Object.entries(result.headers ?? {})) {
-    res.setHeader(key, value);
+    res.statusCode = result.status;
+    for (const [key, value] of Object.entries(result.headers ?? {})) {
+      res.setHeader(key, value);
+    }
+    res.setHeader("Content-Type", "text/plain");
+    res.end(result.body);
+  } catch (err) {
+    console.error("Error handling steam-link start:", err);
+    if (!res.headersSent) {
+      res.statusCode = 500;
+      res.setHeader("Content-Type", "text/plain");
+      res.end("Something went wrong. Go back to Telegram and run /linksteam again.");
+    }
   }
-  res.setHeader("Content-Type", "text/plain");
-  res.end(result.body);
 }
