@@ -13,13 +13,6 @@ export interface Role {
   name: string;
 }
 
-export interface SteamLinkToken {
-  token: string;
-  chatId: number;
-  userId: number;
-  expiresAt: number;
-}
-
 export interface Store {
   upsertMember(member: Member): Promise<void>;
   deleteMember(chatId: number, userId: number): Promise<void>;
@@ -37,12 +30,4 @@ export interface Store {
   unassignUserFromRole(roleId: string, userId: number): Promise<void>;
   getRoleMembers(roleId: string): Promise<Member[]>;
   getUserRoles(chatId: number, userId: number): Promise<Role[]>;
-
-  createSteamLinkToken(record: SteamLinkToken): Promise<void>;
-  getSteamLinkToken(token: string): Promise<SteamLinkToken | undefined>;
-  deleteSteamLinkToken(token: string): Promise<void>;
-
-  setSteamLink(chatId: number, userId: number, steamId64: string): Promise<void>;
-  getSteamLink(chatId: number, userId: number): Promise<string | undefined>;
-  deleteSteamLink(chatId: number, userId: number): Promise<void>;
 }

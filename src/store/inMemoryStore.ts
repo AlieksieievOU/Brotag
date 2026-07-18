@@ -1,4 +1,4 @@
-import type { Member, Role, SteamLinkToken, Store } from "./types.js";
+import type { Member, Role, Store } from "./types.js";
 
 function memberKey(chatId: number, userId: number): string {
   return `${chatId}:${userId}`;
@@ -9,8 +9,6 @@ export class InMemoryStore implements Store {
   private roles = new Map<string, Role>();
   private roleMembers = new Map<string, Set<number>>();
   private nextRoleId = 1;
-  private steamLinkTokens = new Map<string, SteamLinkToken>();
-  private steamLinks = new Map<string, string>();
 
   async upsertMember(member: Member): Promise<void> {
     this.members.set(memberKey(member.chatId, member.userId), member);
@@ -83,29 +81,5 @@ export class InMemoryStore implements Store {
   async getUserRoles(chatId: number, userId: number): Promise<Role[]> {
     const roles = await this.listRoles(chatId);
     return roles.filter((r) => this.roleMembers.get(r.id)?.has(userId));
-  }
-
-  async createSteamLinkToken(record: SteamLinkToken): Promise<void> {
-    this.steamLinkTokens.set(record.token, record);
-  }
-
-  async getSteamLinkToken(token: string): Promise<SteamLinkToken | undefined> {
-    return this.steamLinkTokens.get(token);
-  }
-
-  async deleteSteamLinkToken(token: string): Promise<void> {
-    this.steamLinkTokens.delete(token);
-  }
-
-  async setSteamLink(chatId: number, userId: number, steamId64: string): Promise<void> {
-    this.steamLinks.set(memberKey(chatId, userId), steamId64);
-  }
-
-  async getSteamLink(chatId: number, userId: number): Promise<string | undefined> {
-    return this.steamLinks.get(memberKey(chatId, userId));
-  }
-
-  async deleteSteamLink(chatId: number, userId: number): Promise<void> {
-    this.steamLinks.delete(memberKey(chatId, userId));
   }
 }
