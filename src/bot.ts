@@ -8,6 +8,7 @@ import { handleSetBirthday, handleBirthdays } from "./commands/birthdayCommands.
 import { handleHoroscope } from "./commands/horoscopeCommands.js";
 import { handleNaviSchedule } from "./commands/naviCommands.js";
 import { handleRoast } from "./commands/roastCommands.js";
+import { handleLinkSteam, handleMySteam, handleUnlinkSteam } from "./commands/steamCommands.js";
 import { parseTags } from "./tagging/parseTags.js";
 import { resolveTags } from "./tagging/resolveTags.js";
 import { formatMentions } from "./tagging/formatMentions.js";
@@ -43,6 +44,9 @@ const HELP_TEXT = `Commands:
 /horoscope @username - a joke daily horoscope based on their zodiac sign (or reply to their message; omit target for your own)
 /navi - upcoming NAVI matches with stream links
 /roast @username - a light, good-natured roast (or reply to their message; omit target to roast a random member)
+/linksteam - link your Steam account (opens a browser to verify via Steam login)
+/mysteam - show your linked Steam account
+/unlinksteam - remove your linked Steam account
 /help - show this message
 
 Tagging:
@@ -134,7 +138,7 @@ async function syncAdminsToStore(api: Api, store: Store, chatId: number): Promis
   }
 }
 
-export function createBot(token: string, store: Store): Bot {
+export function createBot(token: string, store: Store, publicUrl: string): Bot {
   const bot = new Bot(token);
 
   // Track every poster as a known member of the chat. Bots are never real
@@ -314,6 +318,24 @@ export function createBot(token: string, store: Store): Bot {
   bot.command("navi", async (ctx) => {
     if (!isGroupChat(ctx.chat.type)) return ctx.reply("This command only works in a group.");
     return ctx.reply(await handleNaviSchedule());
+  });
+
+  bot.command("linksteam", async (ctx) => {
+    if (!isGroupChat(ctx.chat.type)) return ctx.reply("This command only works in a group.");
+    if (!ctx.from) return;
+    return ctx.reply(await handleLinkSteam(store, ctx.chat.id, ctx.from.id, publicUrl));
+  });
+
+  bot.command("mysteam", async (ctx) => {
+    if (!isGroupChat(ctx.chat.type)) return ctx.reply("This command only works in a group.");
+    if (!ctx.from) return;
+    return ctx.reply(await handleMySteam(store, ctx.chat.id, ctx.from.id));
+  });
+
+  bot.command("unlinksteam", async (ctx) => {
+    if (!isGroupChat(ctx.chat.type)) return ctx.reply("This command only works in a group.");
+    if (!ctx.from) return;
+    return ctx.reply(await handleUnlinkSteam(store, ctx.chat.id, ctx.from.id));
   });
 
   bot.command(["help", "commands"], async (ctx) => {
