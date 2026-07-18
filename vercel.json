@@ -2,6 +2,12 @@
   "functions": {
     "api/webhook.ts": {
       "maxDuration": 10
+    },
+    "api/steam-link/start.ts": {
+      "maxDuration": 10
+    },
+    "api/steam-link/callback.ts": {
+      "maxDuration": 10
     }
   }
 }
