@@ -117,3 +117,53 @@ Date: 2026-07-19
     - Add cs2_tracking and match_queue tables to schema
     - Add comprehensive test suite for InMemoryStore CS2 operations
 ```
+
+---
+
+## Review Fix: Concurrent enqueueMatch Race Condition
+
+### Finding
+
+`SupabaseStore.enqueueMatch()` had a race condition: two concurrent calls for the same `(chat_id, share_code)` could both miss the existing row in the select phase and both attempt insert, causing the second call to fail with Postgres unique-violation error (code `23505`).
+
+### What Changed
+
+**File: `src/store/supabaseStore.ts`**
+
+1. **Extracted private helper method** `mergePlayerIdsToMatch()` (lines 299-305):
+   - Takes match id, existing playerIds, and new playerIds
+   - Returns `"merged"` after successful update
+   - Used by both the normal merge path and the race-condition fallback
+
+2. **Added unique-violation fallback** in `enqueueMatch()` (lines 278-291):
+   - When insert fails with code `23505`, re-selects the existing row by (chat_id, share_code)
+   - Falls back to merge path via the helper instead of throwing
+   - Any other insert error still throws normally
+   - Added inline comment explaining the constraint-race rationale
+
+3. **Refactored normal merge path** (line 271):
+   - Now calls `mergePlayerIdsToMatch()` helper to eliminate duplication
+
+### Verification
+
+```bash
+npm run typecheck
+→ PASSED (no type errors)
+
+npm test
+→ Test Files: 19 passed
+→ Tests: 141 passed (expected 141)
+→ Duration: 1.72s
+```
+
+All existing tests remain passing; no unit tests added per requirements (verification via typecheck + full test suite).
+
+### Fix Commit
+
+```bash
+commit c42c450
+Author: OUAlieksieiev
+Date: 2026-07-19
+
+    fix: tolerate concurrent enqueueMatch inserts via unique-violation fallback
+```
