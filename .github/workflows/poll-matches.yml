@@ -1,0 +1,15 @@
+name: Poll CS2 matches
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger poll endpoint
+        run: |
+          curl -sf -X POST "https://brotag.vercel.app/api/poll-matches" \
+            -H "Authorization: Bearer ${{ secrets.POLL_SECRET }}"

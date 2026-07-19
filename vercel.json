@@ -8,6 +8,9 @@
     },
     "api/steam-link/callback.ts": {
       "maxDuration": 10
+    },
+    "api/poll-matches.ts": {
+      "maxDuration": 10
     }
   }
 }
