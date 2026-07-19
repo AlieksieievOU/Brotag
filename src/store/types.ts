@@ -20,6 +20,14 @@ export interface SteamLinkToken {
   expiresAt: number;
 }
 
+export interface Cs2Tracking {
+  chatId: number;
+  userId: number;
+  authCode: string;
+  lastShareCode: string;
+  status: "active" | "broken";
+}
+
 export interface Store {
   upsertMember(member: Member): Promise<void>;
   deleteMember(chatId: number, userId: number): Promise<void>;
@@ -45,4 +53,13 @@ export interface Store {
   setSteamLink(chatId: number, userId: number, steamId64: string): Promise<void>;
   getSteamLink(chatId: number, userId: number): Promise<string | undefined>;
   deleteSteamLink(chatId: number, userId: number): Promise<void>;
+
+  setCs2Tracking(tracking: Cs2Tracking): Promise<void>;
+  getCs2Tracking(chatId: number, userId: number): Promise<Cs2Tracking | undefined>;
+  deleteCs2Tracking(chatId: number, userId: number): Promise<void>;
+  listActiveCs2Tracking(): Promise<Cs2Tracking[]>;
+  updateCs2TrackingCode(chatId: number, userId: number, lastShareCode: string): Promise<void>;
+  markCs2TrackingBroken(chatId: number, userId: number): Promise<void>;
+
+  enqueueMatch(chatId: number, shareCode: string, playerIds: number[]): Promise<"inserted" | "merged">;
 }

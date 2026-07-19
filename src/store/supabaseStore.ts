@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
-import type { Member, Role, SteamLinkToken, Store } from "./types.js";
+import type { Cs2Tracking, Member, Role, SteamLinkToken, Store } from "./types.js";
 
 export class SupabaseStore implements Store {
   private client: SupabaseClient;
@@ -203,6 +203,86 @@ export class SupabaseStore implements Store {
       .eq("user_id", userId);
     if (error) throw error;
   }
+
+  async setCs2Tracking(tracking: Cs2Tracking): Promise<void> {
+    const { error } = await this.client.from("cs2_tracking").upsert({
+      chat_id: tracking.chatId,
+      user_id: tracking.userId,
+      auth_code: tracking.authCode,
+      last_share_code: tracking.lastShareCode,
+      status: tracking.status,
+    });
+    if (error) throw error;
+  }
+
+  async getCs2Tracking(chatId: number, userId: number): Promise<Cs2Tracking | undefined> {
+    const { data, error } = await this.client
+      .from("cs2_tracking")
+      .select("*")
+      .eq("chat_id", chatId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? rowToCs2Tracking(data) : undefined;
+  }
+
+  async deleteCs2Tracking(chatId: number, userId: number): Promise<void> {
+    const { error } = await this.client
+      .from("cs2_tracking")
+      .delete()
+      .eq("chat_id", chatId)
+      .eq("user_id", userId);
+    if (error) throw error;
+  }
+
+  async listActiveCs2Tracking(): Promise<Cs2Tracking[]> {
+    const { data, error } = await this.client.from("cs2_tracking").select("*").eq("status", "active");
+    if (error) throw error;
+    return (data ?? []).map(rowToCs2Tracking);
+  }
+
+  async updateCs2TrackingCode(chatId: number, userId: number, lastShareCode: string): Promise<void> {
+    const { error } = await this.client
+      .from("cs2_tracking")
+      .update({ last_share_code: lastShareCode })
+      .eq("chat_id", chatId)
+      .eq("user_id", userId);
+    if (error) throw error;
+  }
+
+  async markCs2TrackingBroken(chatId: number, userId: number): Promise<void> {
+    const { error } = await this.client
+      .from("cs2_tracking")
+      .update({ status: "broken" })
+      .eq("chat_id", chatId)
+      .eq("user_id", userId);
+    if (error) throw error;
+  }
+
+  async enqueueMatch(chatId: number, shareCode: string, playerIds: number[]): Promise<"inserted" | "merged"> {
+    const { data: existing, error: selectError } = await this.client
+      .from("match_queue")
+      .select("id, player_ids")
+      .eq("chat_id", chatId)
+      .eq("share_code", shareCode)
+      .maybeSingle();
+    if (selectError) throw selectError;
+
+    if (existing) {
+      const merged = [...new Set([...(existing.player_ids ?? []), ...playerIds])];
+      const { error } = await this.client.from("match_queue").update({ player_ids: merged }).eq("id", existing.id);
+      if (error) throw error;
+      return "merged";
+    }
+
+    const { error } = await this.client.from("match_queue").insert({
+      chat_id: chatId,
+      share_code: shareCode,
+      player_ids: playerIds,
+    });
+    if (error) throw error;
+    return "inserted";
+  }
 }
 
 function rowToMember(row: any): Member {
@@ -225,5 +305,15 @@ function rowToSteamLinkToken(row: any): SteamLinkToken {
     chatId: row.chat_id,
     userId: row.user_id,
     expiresAt: new Date(row.expires_at).getTime(),
+  };
+}
+
+function rowToCs2Tracking(row: any): Cs2Tracking {
+  return {
+    chatId: row.chat_id,
+    userId: row.user_id,
+    authCode: row.auth_code,
+    lastShareCode: row.last_share_code,
+    status: row.status,
   };
 }

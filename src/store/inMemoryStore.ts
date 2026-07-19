@@ -1,4 +1,4 @@
-import type { Member, Role, SteamLinkToken, Store } from "./types.js";
+import type { Cs2Tracking, Member, Role, SteamLinkToken, Store } from "./types.js";
 
 function memberKey(chatId: number, userId: number): string {
   return `${chatId}:${userId}`;
@@ -11,6 +11,8 @@ export class InMemoryStore implements Store {
   private nextRoleId = 1;
   private steamLinkTokens = new Map<string, SteamLinkToken>();
   private steamLinks = new Map<string, string>();
+  private cs2Tracking = new Map<string, Cs2Tracking>();
+  private matchQueue = new Map<string, Set<number>>();
 
   async upsertMember(member: Member): Promise<void> {
     this.members.set(memberKey(member.chatId, member.userId), member);
@@ -107,5 +109,44 @@ export class InMemoryStore implements Store {
 
   async deleteSteamLink(chatId: number, userId: number): Promise<void> {
     this.steamLinks.delete(memberKey(chatId, userId));
+  }
+
+  async setCs2Tracking(tracking: Cs2Tracking): Promise<void> {
+    this.cs2Tracking.set(memberKey(tracking.chatId, tracking.userId), tracking);
+  }
+
+  async getCs2Tracking(chatId: number, userId: number): Promise<Cs2Tracking | undefined> {
+    return this.cs2Tracking.get(memberKey(chatId, userId));
+  }
+
+  async deleteCs2Tracking(chatId: number, userId: number): Promise<void> {
+    this.cs2Tracking.delete(memberKey(chatId, userId));
+  }
+
+  async listActiveCs2Tracking(): Promise<Cs2Tracking[]> {
+    return [...this.cs2Tracking.values()].filter((t) => t.status === "active");
+  }
+
+  async updateCs2TrackingCode(chatId: number, userId: number, lastShareCode: string): Promise<void> {
+    const existing = this.cs2Tracking.get(memberKey(chatId, userId));
+    if (!existing) return;
+    this.cs2Tracking.set(memberKey(chatId, userId), { ...existing, lastShareCode });
+  }
+
+  async markCs2TrackingBroken(chatId: number, userId: number): Promise<void> {
+    const existing = this.cs2Tracking.get(memberKey(chatId, userId));
+    if (!existing) return;
+    this.cs2Tracking.set(memberKey(chatId, userId), { ...existing, status: "broken" });
+  }
+
+  async enqueueMatch(chatId: number, shareCode: string, playerIds: number[]): Promise<"inserted" | "merged"> {
+    const key = `${chatId}:${shareCode}`;
+    const existing = this.matchQueue.get(key);
+    if (existing) {
+      playerIds.forEach((id) => existing.add(id));
+      return "merged";
+    }
+    this.matchQueue.set(key, new Set(playerIds));
+    return "inserted";
   }
 }
