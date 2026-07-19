@@ -9,6 +9,7 @@ import { handleHoroscope } from "./commands/horoscopeCommands.js";
 import { handleNaviSchedule } from "./commands/naviCommands.js";
 import { handleRoast } from "./commands/roastCommands.js";
 import { handleLinkSteam, handleMySteam, handleUnlinkSteam } from "./commands/steamCommands.js";
+import { handleTrackCs2, handleUntrackCs2 } from "./commands/cs2Commands.js";
 import { parseTags } from "./tagging/parseTags.js";
 import { resolveTags } from "./tagging/resolveTags.js";
 import { formatMentions } from "./tagging/formatMentions.js";
@@ -47,6 +48,8 @@ const HELP_TEXT = `Commands:
 /linksteam - link your Steam account (opens a browser to verify via Steam login)
 /mysteam - show your linked Steam account
 /unlinksteam - remove your linked Steam account
+/trackcs2 <auth-code> <share-code> - track your CS2 matches for highlights (run bare for setup instructions)
+/untrackcs2 - stop tracking your CS2 matches
 /help - show this message
 
 Tagging:
@@ -336,6 +339,18 @@ export function createBot(token: string, store: Store, publicUrl: string): Bot {
     if (!isGroupChat(ctx.chat.type)) return ctx.reply("This command only works in a group.");
     if (!ctx.from) return;
     return ctx.reply(await handleUnlinkSteam(store, ctx.chat.id, ctx.from.id));
+  });
+
+  bot.command("trackcs2", async (ctx) => {
+    if (!isGroupChat(ctx.chat.type)) return ctx.reply("This command only works in a group.");
+    if (!ctx.from) return;
+    return ctx.reply(await handleTrackCs2(store, ctx.chat.id, ctx.from.id, ctx.match.trim()));
+  });
+
+  bot.command("untrackcs2", async (ctx) => {
+    if (!isGroupChat(ctx.chat.type)) return ctx.reply("This command only works in a group.");
+    if (!ctx.from) return;
+    return ctx.reply(await handleUntrackCs2(store, ctx.chat.id, ctx.from.id));
   });
 
   bot.command(["help", "commands"], async (ctx) => {
