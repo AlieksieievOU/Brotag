@@ -17,11 +17,41 @@ describe("handleMySteam", () => {
     expect(reply).toBe("You haven't linked a Steam account yet — run /linksteam.");
   });
 
-  it("reports the linked profile", async () => {
+  it("reports the linked profile and tracking status", async () => {
     const store = new InMemoryStore();
     await store.setSteamLink(1, 100, "76561198000000000");
     const reply = await handleMySteam(store, 1, 100);
-    expect(reply).toBe("Your linked Steam account: https://steamcommunity.com/profiles/76561198000000000");
+    expect(reply).toBe(
+      "Your linked Steam account: https://steamcommunity.com/profiles/76561198000000000\nCS2 tracking: off — use /trackcs2 to get match highlights.",
+    );
+  });
+
+  it("reports active tracking", async () => {
+    const store = new InMemoryStore();
+    await store.setSteamLink(1, 100, "76561198000000000");
+    await store.setCs2Tracking({
+      chatId: 1,
+      userId: 100,
+      authCode: "AAAA-BBBBB-CCCC",
+      lastShareCode: "CSGO-aaaaa-bbbbb-ccccc-ddddd-eeeee",
+      status: "active",
+    });
+    const reply = await handleMySteam(store, 1, 100);
+    expect(reply).toContain("CS2 tracking: on");
+  });
+
+  it("reports broken tracking", async () => {
+    const store = new InMemoryStore();
+    await store.setSteamLink(1, 100, "76561198000000000");
+    await store.setCs2Tracking({
+      chatId: 1,
+      userId: 100,
+      authCode: "AAAA-BBBBB-CCCC",
+      lastShareCode: "CSGO-aaaaa-bbbbb-ccccc-ddddd-eeeee",
+      status: "broken",
+    });
+    const reply = await handleMySteam(store, 1, 100);
+    expect(reply).toContain("CS2 tracking: broken — re-run /trackcs2");
   });
 });
 

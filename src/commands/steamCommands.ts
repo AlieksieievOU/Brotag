@@ -14,7 +14,14 @@ export async function handleLinkSteam(
 export async function handleMySteam(store: Store, chatId: number, userId: number): Promise<string> {
   const steamId64 = await store.getSteamLink(chatId, userId);
   if (!steamId64) return "You haven't linked a Steam account yet — run /linksteam.";
-  return `Your linked Steam account: https://steamcommunity.com/profiles/${steamId64}`;
+  const tracking = await store.getCs2Tracking(chatId, userId);
+  const trackingLine =
+    tracking === undefined
+      ? "CS2 tracking: off — use /trackcs2 to get match highlights."
+      : tracking.status === "active"
+        ? "CS2 tracking: on."
+        : "CS2 tracking: broken — re-run /trackcs2.";
+  return `Your linked Steam account: https://steamcommunity.com/profiles/${steamId64}\n${trackingLine}`;
 }
 
 export async function handleUnlinkSteam(store: Store, chatId: number, userId: number): Promise<string> {
