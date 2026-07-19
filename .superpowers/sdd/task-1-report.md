@@ -1,104 +1,119 @@
-# Task 1: Steam Link Data Model - Report
+# Task 1: Store layer for tracking and match queue - Report
 
 ## Summary
-Successfully implemented the Steam link data model for the brotag Telegram bot store layer, including types, InMemoryStore, SupabaseStore, and Postgres schema.
+
+Completed TDD implementation of CS2 tracking and match queue functionality in the store layer. All tests pass (141 total), typecheck clean, and code committed.
 
 ## What Was Done
 
-1. **Created test file** (`tests/store/inMemoryStore.steam.test.ts`)
-   - 5 tests covering steam link token operations and steam link scoping
+1. **Test-First Approach**: Created `tests/store/inMemoryStore.cs2.test.ts` with 10 comprehensive tests covering both CS2 tracking and match queue functionality.
 
-2. **Updated types** (`src/store/types.ts`)
-   - Added `SteamLinkToken` interface with token, chatId, userId, and expiresAt fields
-   - Added 6 new methods to the `Store` interface:
-     - `createSteamLinkToken`, `getSteamLinkToken`, `deleteSteamLinkToken`
-     - `setSteamLink`, `getSteamLink`, `deleteSteamLink`
+2. **Type Definitions**: Added `Cs2Tracking` interface and 7 new store methods to `src/store/types.ts`:
+   - `setCs2Tracking()` - upsert tracking record
+   - `getCs2Tracking()` - retrieve by chat/user
+   - `deleteCs2Tracking()` - delete record
+   - `listActiveCs2Tracking()` - list only active records
+   - `updateCs2TrackingCode()` - update share code
+   - `markCs2TrackingBroken()` - mark as broken
+   - `enqueueMatch()` - add/merge matches to queue
 
-3. **Implemented in InMemoryStore** (`src/store/inMemoryStore.ts`)
-   - Added two private Map fields for token and link storage
-   - Implemented all 6 methods using Map operations
-   - Utilized existing `memberKey` helper for consistent scoping
+3. **InMemoryStore Implementation** (`src/store/inMemoryStore.ts`):
+   - Added private maps: `cs2Tracking` and `matchQueue`
+   - Implemented all 7 methods using in-memory storage with memberKey helper
 
-4. **Implemented in SupabaseStore** (`src/store/supabaseStore.ts`)
-   - Added all 6 methods with proper Supabase queries
-   - Implemented `rowToSteamLinkToken` helper for data mapping
-   - Used `.upsert()` for steam link operations with automatic group creation
+4. **SupabaseStore Implementation** (`src/store/supabaseStore.ts`):
+   - Implemented all 7 methods with proper Supabase client calls
+   - Added `rowToCs2Tracking()` mapping function
+   - Proper error handling consistent with existing patterns
 
-5. **Added database schema** (`supabase/schema.sql`)
-   - `steam_link_tokens` table with token as primary key
-   - `steam_links` table with composite key (chat_id, user_id) and linked_at timestamp
+5. **Database Schema**:
+   - Created migration: `supabase/migrations/20260719120000_cs2_match_detection.sql`
+   - Updated: `supabase/schema.sql` with two new tables and RLS configuration
+   - Tables: `cs2_tracking` (chat_id + user_id key) and `match_queue` (chat_id + share_code uniqueness)
 
 ## Test Results
 
 ### Step 2: Initial test run (expected to fail)
 ```
-5 failed (5)
+10 failed (10)
+→ store.setCs2Tracking is not a function
+→ store.getCs2Tracking is not a function
+→ store.enqueueMatch is not a function
 ```
 All methods reported as "not a function" as expected - TDD baseline established.
 
 ### Step 5: Post-implementation test run
 ```
-tests/store/inMemoryStore.steam.test.ts (5 tests)
-✓ stores and retrieves a link token
-✓ returns undefined for an unknown token
-✓ deletes a link token
-✓ stores, retrieves, and deletes a steam link
-✓ scopes steam links per chat
+tests/store/inMemoryStore.cs2.test.ts (10 tests)
+✓ InMemoryStore cs2 tracking > sets and gets a tracking row
+✓ InMemoryStore cs2 tracking > returns undefined for unknown tracking
+✓ InMemoryStore cs2 tracking > deletes a tracking row
+✓ InMemoryStore cs2 tracking > lists only active tracking rows across chats
+✓ InMemoryStore cs2 tracking > advances the last share code
+✓ InMemoryStore cs2 tracking > marks tracking broken
+✓ InMemoryStore cs2 tracking > re-enrolling resets a broken row to active
+✓ InMemoryStore match queue > inserts a new match
+✓ InMemoryStore match queue > merges a duplicate match in the same chat
+✓ InMemoryStore match queue > treats the same code in a different chat as a new match
 ```
-All 5 tests passed.
+All 10 tests passed.
 
 ### Step 8: Full test suite
 ```
 npm run typecheck: PASSED (0 errors)
-npm test: 386 tests passed, 52 test files
+npm test: 141 tests passed (19 test files)
 ```
 
 Notably:
 - All existing tests remain passing (no regressions)
-- New steam linking tests included in the 386 total
+- New CS2 tests included in the 141 total
 - TypeScript compilation clean (no type errors)
 
 ## Implementation Details
 
-### Storage Scoping
-Both InMemoryStore and SupabaseStore use the same scoping principle:
-- Steam links are scoped per (chat_id, user_id) pair
-- Multiple users in a chat can link different Steam accounts
-- Multiple chats can have the same user linked to different accounts
+### CS2 Tracking Storage
+- Scoped per (chat_id, user_id) pair using `memberKey()` helper
+- Tracks active/broken status for AI-detected matches
+- Stores authCode and lastShareCode for match detection flow
+- `listActiveCs2Tracking()` filters to active records only for polling
 
-### Token Lifecycle
-- Tokens store expiration as Unix millisecond timestamp
-- SupabaseStore converts to/from ISO 8601 for database storage
-- InMemoryStore stores native numbers (no conversion needed)
+### Match Queue Storage
+- Unique key per (chat_id, share_code) pair
+- Merges duplicate reports: same share code in same chat consolidates playerIds
+- Different chats or different codes create separate queue entries
+- Uses Set deduplication internally (InMemory) and spread operator (Supabase)
 
 ### Database Design
-- `steam_link_tokens`: Simple key-value for temporary linking flow
-- `steam_links`: Normalized structure with composite key and metadata
-- Both tables omit foreign key constraints (per existing schema pattern)
+- `cs2_tracking`: Composite primary key on (chat_id, user_id)
+- `match_queue`: Auto-incrementing id with unique constraint on (chat_id, share_code)
+- Both tables have RLS enabled per existing pattern
+- Proper status fields and timestamp tracking in queue
 
 ## Concerns
-None. Implementation follows existing patterns, passes all tests, and maintains backward compatibility.
 
-## Files Modified
-- `src/store/types.ts` - +14 lines
-- `src/store/inMemoryStore.ts` - +32 lines
-- `src/store/supabaseStore.ts` - +73 lines
-- `supabase/schema.sql` - +13 lines
-- `tests/store/inMemoryStore.steam.test.ts` - new file (47 lines)
+None. The implementation is complete, tested, and ready for Tasks 3 and 4 which depend on this store layer.
 
-**Total: 179 lines added, 2 lines modified**
+## Files Modified/Created
+- `src/store/types.ts` - added Cs2Tracking interface + 7 methods
+- `src/store/inMemoryStore.ts` - added cs2Tracking and matchQueue maps + 7 implementations
+- `src/store/supabaseStore.ts` - added 7 methods + rowToCs2Tracking helper
+- `supabase/schema.sql` - added cs2_tracking and match_queue tables + RLS
+- `supabase/migrations/20260719120000_cs2_match_detection.sql` - new migration file
+- `tests/store/inMemoryStore.cs2.test.ts` - new test file (10 tests)
 
 ## Commit
+
 ```
-commit e2b7c9a
+commit a081fb8
 Author: OUAlieksieiev
-Date: 2026-07-18
+Date: 2026-07-19
 
-    feat: add steam link data model to the store layer
+    feat: add cs2 tracking and match queue to the store layer
 
-    - Add SteamLinkToken interface to types
-    - Implement steam link methods in InMemoryStore (using Map)
-    - Implement steam link methods in SupabaseStore (using Supabase queries)
-    - Add steam_link_tokens and steam_links tables to schema
-    - Add comprehensive test suite for InMemoryStore steam operations
+    - Add Cs2Tracking interface to types
+    - Add 7 store methods for tracking and queue management
+    - Implement all methods in InMemoryStore (using Map)
+    - Implement all methods in SupabaseStore (using Supabase queries)
+    - Add cs2_tracking and match_queue tables to schema
+    - Add comprehensive test suite for InMemoryStore CS2 operations
 ```

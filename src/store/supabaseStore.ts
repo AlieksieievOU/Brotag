@@ -269,10 +269,7 @@ export class SupabaseStore implements Store {
     if (selectError) throw selectError;
 
     if (existing) {
-      const merged = [...new Set([...(existing.player_ids ?? []), ...playerIds])];
-      const { error } = await this.client.from("match_queue").update({ player_ids: merged }).eq("id", existing.id);
-      if (error) throw error;
-      return "merged";
+      return this.mergePlayerIdsToMatch(existing.id, existing.player_ids, playerIds);
     }
 
     const { error } = await this.client.from("match_queue").insert({
@@ -280,8 +277,36 @@ export class SupabaseStore implements Store {
       share_code: shareCode,
       player_ids: playerIds,
     });
+
+    // Handle unique constraint violation (code 23505): another concurrent call may have
+    // inserted the same (chat_id, share_code) row between our select and insert.
+    // Fall back to merge path instead of throwing.
+    if (error && error.code === "23505") {
+      const { data: existing, error: selectError } = await this.client
+        .from("match_queue")
+        .select("id, player_ids")
+        .eq("chat_id", chatId)
+        .eq("share_code", shareCode)
+        .maybeSingle();
+      if (selectError) throw selectError;
+      if (!existing) throw error; // Shouldn't happen, but be safe
+      return this.mergePlayerIdsToMatch(existing.id, existing.player_ids, playerIds);
+    }
+
     if (error) throw error;
     return "inserted";
+  }
+
+  // Merge playerIds into existing match queue row
+  private async mergePlayerIdsToMatch(
+    id: string,
+    existingPlayerIds: number[] | null,
+    newPlayerIds: number[]
+  ): Promise<"merged"> {
+    const merged = [...new Set([...(existingPlayerIds ?? []), ...newPlayerIds])];
+    const { error } = await this.client.from("match_queue").update({ player_ids: merged }).eq("id", id);
+    if (error) throw error;
+    return "merged";
   }
 }
 
