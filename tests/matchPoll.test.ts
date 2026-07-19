@@ -145,4 +145,36 @@ describe("runMatchPoll", () => {
     expect(summary.newMatches).toBe(2);
     expect(notify).toHaveBeenCalledTimes(2);
   });
+
+  it("enqueues each match before advancing the tracking cursor past it", async () => {
+    class RecordingStore extends InMemoryStore {
+      calls: Array<{ kind: "enqueueMatch" | "updateCs2TrackingCode"; shareCode: string }> = [];
+
+      async enqueueMatch(chatId: number, shareCode: string, playerIds: number[]): Promise<"inserted" | "merged"> {
+        this.calls.push({ kind: "enqueueMatch", shareCode });
+        return super.enqueueMatch(chatId, shareCode, playerIds);
+      }
+
+      async updateCs2TrackingCode(chatId: number, userId: number, lastShareCode: string): Promise<void> {
+        this.calls.push({ kind: "updateCs2TrackingCode", shareCode: lastShareCode });
+        return super.updateCs2TrackingCode(chatId, userId, lastShareCode);
+      }
+    }
+
+    const store = new RecordingStore();
+    await setupUser(store, 1, 100, "Ada");
+    const fetchImpl = steamFetch({ "76561198000000100": [{ nextcode: CODE1 }, { nextcode: CODE2 }] });
+    const notify = async () => {};
+
+    const summary = await runMatchPoll(store, "key", fetchImpl as unknown as typeof fetch, notify);
+
+    expect(summary.newMatches).toBe(2);
+    for (const code of [CODE1, CODE2]) {
+      const enqueueIdx = store.calls.findIndex((c) => c.kind === "enqueueMatch" && c.shareCode === code);
+      const updateIdx = store.calls.findIndex((c) => c.kind === "updateCs2TrackingCode" && c.shareCode === code);
+      expect(enqueueIdx).toBeGreaterThanOrEqual(0);
+      expect(updateIdx).toBeGreaterThanOrEqual(0);
+      expect(enqueueIdx).toBeLessThan(updateIdx);
+    }
+  });
 });

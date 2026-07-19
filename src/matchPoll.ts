@@ -33,9 +33,9 @@ export async function runMatchPoll(
 ): Promise<PollSummary> {
   const tracked = await store.listActiveCs2Tracking();
   const summary: PollSummary = { checked: tracked.length, newMatches: 0, brokenAuth: 0 };
-  // (chatId -> shareCode -> userIds) collected across the whole sweep so that
+  // (chatId -> shareCode -> { userIds, inserted }) collected across the whole sweep so that
   // two users who played the same match produce one queue row and one message.
-  const found = new Map<number, Map<string, Set<number>>>();
+  const found = new Map<number, Map<string, { players: Set<number>; inserted: boolean }>>();
 
   for (const tracking of tracked) {
     const steamId64 = await store.getSteamLink(tracking.chatId, tracking.userId);
@@ -56,11 +56,13 @@ export async function runMatchPoll(
       const result = await getNextShareCode(steamApiKey, steamId64, tracking.authCode, knownCode, fetchImpl);
       if (result.kind === "next") {
         knownCode = result.shareCode;
+        const outcome = await store.enqueueMatch(tracking.chatId, knownCode, [tracking.userId]);
         await store.updateCs2TrackingCode(tracking.chatId, tracking.userId, knownCode);
-        const chatMatches = found.get(tracking.chatId) ?? new Map<string, Set<number>>();
-        const players = chatMatches.get(knownCode) ?? new Set<number>();
-        players.add(tracking.userId);
-        chatMatches.set(knownCode, players);
+        const chatMatches = found.get(tracking.chatId) ?? new Map<string, { players: Set<number>; inserted: boolean }>();
+        const entry = chatMatches.get(knownCode) ?? { players: new Set<number>(), inserted: false };
+        entry.players.add(tracking.userId);
+        if (outcome === "inserted") entry.inserted = true;
+        chatMatches.set(knownCode, entry);
         found.set(tracking.chatId, chatMatches);
         continue;
       }
@@ -83,11 +85,10 @@ export async function runMatchPoll(
   }
 
   for (const [chatId, matches] of found) {
-    for (const [shareCode, players] of matches) {
-      const outcome = await store.enqueueMatch(chatId, shareCode, [...players]);
-      if (outcome !== "inserted") continue;
+    for (const [, entry] of matches) {
+      if (!entry.inserted) continue;
       summary.newMatches++;
-      const names = await Promise.all([...players].map((id) => memberName(store, chatId, id)));
+      const names = await Promise.all([...entry.players].map((id) => memberName(store, chatId, id)));
       await safeNotify(notify, chatId, `🎮 New match detected for ${names.join(", ")} — queued for highlights.`);
     }
   }
